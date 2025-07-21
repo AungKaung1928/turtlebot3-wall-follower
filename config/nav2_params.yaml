@@ -1,0 +1,4 @@
+# Basic navigation parameters
+robot_base_frame: "base_link"
+global_frame: "map"
+robot_radius: 0.22
