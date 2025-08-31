@@ -186,22 +186,3 @@ To run on real TurtleBot3:
 2. **⚙️ Update parameters**: Adjust safety distances for real-world conditions  
 3. **🧪 Test gradually**: Start with very conservative parameters
 4. **👀 Monitor closely**: Always be ready to emergency stop
-
-## 📜 License
-
-This project is licensed under the terms specified in the package.xml file.
-
-## 🤝 Contributing
-
-1. 🍴 Fork the repository
-2. 🌟 Create a feature branch
-3. 🧪 Test thoroughly in simulation
-4. 📋 Submit a pull request with detailed description
-
-## 💬 Support
-
-For issues and questions:
-- 📚 Check ROS2 Humble documentation
-- 🎓 Review TurtleBot3 official tutorials
-- 📖 Examine Gazebo Classic documentation
-- 🧪 Test in simulation before hardware deployment
