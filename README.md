@@ -43,6 +43,30 @@ turtlebot3_wall_follower_ws/
 - **⚠️ Collision Avoidance**: Emergency stop and escape maneuvers when obstacles detected
 - **📊 Real-time Visualization**: Pre-configured RViz setup for monitoring robot behavior
 
+# 📚 Libraries & Dependencies
+
+This project utilizes several key libraries and frameworks for autonomous robotics:
+
+## 🔧 Core ROS2 Libraries
+- **[![rclpy](https://img.shields.io/badge/rclpy-ROS2_Python-blue?style=flat-square)](https://docs.ros.org/en/humble/p/rclpy/)** - ROS2 Python client library for node creation, publishers, subscribers, and timers
+- **[![sensor_msgs](https://img.shields.io/badge/sensor__msgs-LaserScan-green?style=flat-square)](https://docs.ros.org/en/humble/p/sensor_msgs/)** - ROS2 message types for sensor data (LiDAR/LaserScan processing)
+- **[![geometry_msgs](https://img.shields.io/badge/geometry__msgs-Twist-orange?style=flat-square)](https://docs.ros.org/en/humble/p/geometry_msgs/)** - ROS2 message types for robot movement commands (velocity control)
+
+## 🐍 Python Standard Libraries
+- **[![math](https://img.shields.io/badge/math-Standard-yellow?style=flat-square)](https://docs.python.org/3/library/math.html)** - Mathematical functions for angle calculations, NaN/infinity checks, and trigonometry
+
+## 🤖 Robotics Algorithms
+- **PID Control** - Proportional-Derivative controller for precise wall-following behavior
+- **Sensor Fusion** - Real-time LiDAR data processing and filtering for obstacle detection
+- **State Machine** - Behavioral control system (search → detect → follow → avoid)
+
+## 🏗️ Architecture Patterns
+- **Publisher/Subscriber Model** - Asynchronous ROS2 communication for `/cmd_vel` and `/scan` topics  
+- **Timer-based Control Loop** - 50Hz real-time control system (0.05s intervals)
+- **Reactive Navigation** - Sensor-driven decision making for autonomous wall following
+
+> 💡 **Note**: This project focuses on **low-level sensor control** and **reactive robotics**, making it complementary to higher-level navigation frameworks like Nav2.
+
 ## 📦 Installation
 
 1. **Install TurtleBot3 packages:** 📥
