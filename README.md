@@ -1,6 +1,6 @@
 # 🤖 TurtleBot3 Wall Following Robot
 
-A ROS2-based wall following robot implementation for TurtleBot3 with enhanced safety features and collision avoidance. 🚀
+A ROS2-based wall following robot implementation for TurtleBot3 with enhanced safety features and collision avoidance. 
 
 ##  Prerequisites
 
