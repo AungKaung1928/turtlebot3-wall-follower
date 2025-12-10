@@ -2,19 +2,21 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypealternatives="yes"?>
 <package format="3">
   <name>wall_following_project</name>
-  <version>0.0.0</version>
-  <description>Simple wall following robot project</description>
-  <maintainer email="user@todo.todo">user</maintainer>
-  <license>TODO: License declaration</license>
+  <version>1.0.0</version>
+  <description>Production-grade wall following robot with PID control and collision avoidance</description>
+  <maintainer email="your_email@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
-
+  
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

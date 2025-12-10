@@ -1,3 +1,24 @@
 wall_follower_controller:
   ros__parameters:
     use_sim_time: true
+    
+    # Control parameters
+    desired_distance: 1.4           # Target distance from wall (meters)
+    forward_speed: 0.2              # Normal forward speed (m/s)
+    search_speed: 0.12              # Speed while searching for wall (m/s)
+    max_angular_speed: 0.5          # Maximum rotation speed (rad/s)
+    
+    # PID controller gains
+    kp: 1.2                         # Proportional gain
+    kd: 0.5                         # Derivative gain
+    
+    # Safety distances (meters)
+    emergency_stop_distance: 0.70   # Immediate stop distance
+    slow_down_distance: 1.0         # Start slowing down distance
+    wall_min_distance: 0.55         # Minimum acceptable wall distance
+    wall_lost_distance: 1.8         # Distance to consider wall lost
+    side_clearance: 0.5             # Minimum side obstacle clearance
+    
+    # Behavior parameters
+    search_period_cycles: 80        # Cycles before reversing search direction (20Hz)
+    stuck_threshold_cycles: 3       # Cycles before declaring stuck condition
