@@ -148,6 +148,11 @@ ros2 param set /wall_follower_controller kd 0.8
 ros2 param list /wall_follower_controller
 ros2 param get /wall_follower_controller desired_distance
 ```
+**Monitor robot state (SEARCHING/FOLLOWING/AVOIDING):**
+```bash
+ros2 topic echo /wall_follower/state
+```
+
 > **Note:** Changes take effect immediately but are **not saved**. To make permanent changes, edit `config/wall_following_params.yaml` and restart.
 ---
 ## 🎯 Tuning Guide
