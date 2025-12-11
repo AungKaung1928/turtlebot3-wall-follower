@@ -1,4 +1,3 @@
-```markdown
 # 🤖 TurtleBot3 Wall Following Robot
 A production-ready ROS2 wall following implementation using PID control and reactive navigation for TurtleBot3.
 ---
@@ -229,4 +228,3 @@ ros2 param get /wall_follower_controller use_sim_time  # Should be true
 - [ROS2 Humble Documentation](https://docs.ros.org/en/humble/)
 - [TurtleBot3 Manual](https://emanual.robotis.com/docs/en/platform/turtlebot3/overview/)
 - [PID Control Tutorial](https://en.wikipedia.org/wiki/PID_controller)
-```
