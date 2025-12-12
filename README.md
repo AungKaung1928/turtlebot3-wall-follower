@@ -1,13 +1,13 @@
-# 🤖 TurtleBot3 Wall Following Robot
+#  TurtleBot3 Wall Following Robot
 A production-ready ROS2 wall following implementation using PID control and reactive navigation for TurtleBot3.
 ---
-## 📋 Prerequisites
+##  Prerequisites
 - [![ROS2](https://img.shields.io/badge/ROS2-Humble-blue?style=for-the-badge&logo=ros&logoColor=white)](https://docs.ros.org/en/humble/Installation.html) **ROS2 Humble**
 - [![Python](https://img.shields.io/badge/Python-3.8+-yellow?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/) **Python 3.8+**
 - [![Gazebo](https://img.shields.io/badge/Gazebo-Classic-orange?style=for-the-badge&logo=gazebo&logoColor=white)](https://classic.gazebosim.org/tutorials?tut=install_ubuntu) **Gazebo Classic**
 - [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange?style=for-the-badge&logo=ubuntu&logoColor=white)](https://ubuntu.com/) **Ubuntu 22.04**
 ---
-## 🏗️ Project Structure
+##  Project Structure
 ```
 turtlebot3_wall_follower_ws/
 ├── src/
@@ -27,7 +27,7 @@ turtlebot3_wall_follower_ws/
 └── README.md
 ```
 ---
-## 🧠 Algorithm Overview
+##  Algorithm Overview
 ### Core Concept: Reactive Wall Following
 The robot maintains a **constant distance from walls** using sensor feedback without requiring maps or localization (SLAM-free navigation).
 ### Control Flow
@@ -70,7 +70,7 @@ Where:
 | **Collision Detector** | Multi-zone safety checks (front, sides, wide angles) |
 | **Velocity Publisher** | Sends movement commands to `/cmd_vel` |
 ---
-## ⚙️ Configuration Parameters
+##  Configuration Parameters
 **File:** `config/wall_following_params.yaml`
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -86,7 +86,7 @@ Where:
 | `wall_lost_distance` | 2.5m | Distance to consider wall lost |
 | `side_clearance` | 0.4m | Minimum side obstacle margin |
 ---
-## 🚀 Installation
+##  Installation
 ```bash
 # 1. Install TurtleBot3 packages
 sudo apt update
@@ -102,7 +102,7 @@ colcon build
 source install/setup.bash
 ```
 ---
-## 🎮 Usage
+##  Usage
 ### Quick Start (Single Command)
 ```bash
 ros2 launch wall_following_project wall_follower_gazebo.launch.py
@@ -124,7 +124,7 @@ ros2 launch wall_following_project wall_following.launch.py
 rviz2 -d ~/turtlebot3_wall_follower_ws/src/wall_following_project/rviz/wall_follower_config.rviz
 ```
 ---
-## 🔧 Runtime Parameter Tuning
+##  Runtime Parameter Tuning
 ### Change Parameters Without Stopping Simulation
 **Change wall distance (while running):**
 ```bash
@@ -155,7 +155,7 @@ ros2 topic echo /wall_follower/state
 
 > **Note:** Changes take effect immediately but are **not saved**. To make permanent changes, edit `config/wall_following_params.yaml` and restart.
 ---
-## 🎯 Tuning Guide
+##  Tuning Guide
 ### For Faster Following
 ```yaml
 forward_speed: 0.35        # Increase from 0.30
@@ -181,7 +181,7 @@ slow_down_distance: 1.0        # More gradual slowdown
 side_clearance: 0.5            # Wider safety margin
 ```
 ---
-## 🐛 Troubleshooting
+##  Troubleshooting
 ### Robot doesn't move
 ```bash
 # Check laser data
@@ -203,14 +203,14 @@ ros2 param get /wall_follower_controller use_sim_time  # Should be true
 - Decrease `kp` (e.g., 0.5)
 - Decrease `forward_speed` (e.g., 0.20)
 ---
-## 📡 ROS2 Topics
+##  ROS2 Topics
 ### Subscribed
 - `/scan` (sensor_msgs/LaserScan) - LiDAR data for wall detection
 ### Published
 - `/cmd_vel` (geometry_msgs/Twist) - Velocity commands
 - `/wall_follower/state` (std_msgs/String) - Current state (SEARCHING/FOLLOWING/AVOIDING)
 ---
-## 🎓 Technical Details
+##  Technical Details
 ### Key Features
 ✅ **YAML-configurable parameters** - No recompilation needed for tuning  
 ✅ **Parameter validation** - Runtime checks prevent invalid configurations  
@@ -229,7 +229,7 @@ ros2 param get /wall_follower_controller use_sim_time  # Should be true
 - `geometry_msgs` - Twist (velocity) message type
 - `std_msgs` - String message for state publishing
 ---
-## 🔗 Resources
+##  Resources
 - [ROS2 Humble Documentation](https://docs.ros.org/en/humble/)
 - [TurtleBot3 Manual](https://emanual.robotis.com/docs/en/platform/turtlebot3/overview/)
 - [PID Control Tutorial](https://en.wikipedia.org/wiki/PID_controller)
