@@ -15,6 +15,11 @@ wall_follower_controller:
     # the proportional term. kd is filtered in the node; keep it modest.
     kp: 2.0                         # Proportional gain
     kd: 0.6                         # Derivative gain
+    # Two-beam wall estimate: side beam plus one swung beam_spread_deg forward.
+    # The error is the wall distance predicted lookahead_distance ahead, so a
+    # heading that converges on the wall is corrected before it arrives.
+    lookahead_distance: 0.3         # metres ahead used for the predicted distance
+    beam_spread_deg: 40.0           # angle between the two wall beams
 
     # Safety distances (meters)
     # Must satisfy: side_clearance < wall_min < desired < wall_lost

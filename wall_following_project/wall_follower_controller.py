@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
+from rclpy.signals import SignalHandlerOptions
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
@@ -65,6 +66,8 @@ class WallFollowerController(Node):
         self.declare_parameter('max_angular_speed', 0.6)
         self.declare_parameter('kp', 1.8)
         self.declare_parameter('kd', 0.7)
+        self.declare_parameter('lookahead_distance', 0.3)
+        self.declare_parameter('beam_spread_deg', 40.0)
         
         # Safety parameters
         self.declare_parameter('emergency_stop_distance', 0.55)
@@ -86,6 +89,8 @@ class WallFollowerController(Node):
         self.max_angular_speed = self._get_validated_param('max_angular_speed', 0.1, 1.5)
         self.kp = self._get_validated_param('kp', 0.1, 5.0)
         self.kd = self._get_validated_param('kd', 0.0, 2.0)
+        self.lookahead = self._get_validated_param('lookahead_distance', 0.1, 1.0)
+        self.beam_spread_deg = self._get_validated_param('beam_spread_deg', 20.0, 70.0)
         
         # Safety parameters
         self.emergency_stop = self._get_validated_param('emergency_stop_distance', 0.2, 1.0)
@@ -251,48 +256,77 @@ class WallFollowerController(Node):
         
         return cmd
 
+    def _wall_geometry(self):
+        """
+        Two-beam wall estimate: (perpendicular distance, heading angle to wall).
+
+        b is the side beam (+-90 deg), a the beam swung beam_spread_deg toward
+        the front. alpha > 0 means the heading converges on the wall. A single
+        side beam inflates as soon as the robot yaws, which made the lost-wall
+        check fire every time the P term steered inward.
+        Returns None when either beam has no return.
+        """
+        sign = -1 if self.wall_side == 'right' else 1
+        theta = math.radians(self.beam_spread_deg)
+        b = self.get_distance_at_angle(sign * 90, average=True)
+        a = self.get_distance_at_angle(sign * (90 - self.beam_spread_deg), average=True)
+        if not (math.isfinite(a) and math.isfinite(b)):
+            return None
+        alpha = math.atan2(b - a * math.cos(theta), a * math.sin(theta))
+        alpha = max(-1.0, min(1.0, alpha))
+        return b * math.cos(alpha), alpha
+
     def follow_wall(self):
         """
-        Wall following with PID control.
+        Wall following with PD control on the look-ahead wall distance.
         Returns: Twist command
         """
         cmd = Twist()
-        
-        # Get wall distance: minimum over the side arc approximates the
-        # perpendicular distance even when the robot is not parallel to the wall.
-        if self.wall_side == 'right':
-            wall_dist = self.get_min_distance_in_arc(-105, -75, 3)
+        sign = -1 if self.wall_side == 'right' else 1
+        lo, hi = (-135, -45) if self.wall_side == 'right' else (45, 135)
+        arc_min = self.get_min_distance_in_arc(lo, hi, 3)
+        geometry = self._wall_geometry()
+        if geometry is None:
+            wall_dist, alpha = arc_min, 0.0
         else:
-            wall_dist = self.get_min_distance_in_arc(75, 105, 3)
-        
-        # Lost wall? Return to search
-        if wall_dist > self.wall_lost:
+            wall_dist, alpha = geometry
+
+        # Wall ended beside us (outside corner): both beams look past it while
+        # the rear-side arc still has it. Arc around the corner at the standoff
+        # radius instead of dropping into the open-space search sweep.
+        if geometry is None and arc_min <= self.wall_lost:
+            cmd.linear.x = self.search_speed
+            cmd.angular.z = sign * self.search_speed / self.desired_distance
+            return cmd
+
+        # Lost wall? Only when neither the estimate nor the wide arc sees it.
+        if min(wall_dist, arc_min) > self.wall_lost:
             self.state = RobotState.SEARCHING
-            self.search_direction = 1 if self.wall_side == 'right' else -1
+            # An outside corner: curve toward the side the wall was on to wrap it.
+            self.search_direction = -1 if self.wall_side == 'right' else 1
             self.get_logger().info(f'Wall lost (distance: {wall_dist:.2f}m)')
             return Twist()
-        
+
         # Too close to wall - emergency turn away
         if wall_dist < self.wall_min:
             cmd.linear.x = 0.08
-            cmd.angular.z = 0.6 if self.wall_side == 'right' else -0.6
+            cmd.angular.z = -sign * 0.6
             return cmd
-        
-        # PID control for wall following
-        error = self.desired_distance - wall_dist
+
+        # Distance the robot will have after lookahead metres at the current
+        # heading. Steering on this instead of the raw side range damps the
+        # approach: converging fast shrinks the error before the wall arrives.
+        predicted = wall_dist - self.lookahead * math.sin(alpha)
+        error = predicted - self.desired_distance  # > 0: too far from wall
         raw_derivative = (error - self.prev_error) / 0.05  # 20Hz = 0.05s
         # Dividing by dt amplifies scan noise 20x, so filter before using it
         self.filtered_derivative = (0.7 * self.filtered_derivative
                                     + 0.3 * raw_derivative)
         angular_velocity = self.kp * error + self.kd * self.filtered_derivative
-        
-        # Invert angular velocity for left wall
-        if self.wall_side == 'left':
-            angular_velocity = -angular_velocity
-        
-        # Clamp angular velocity
-        cmd.angular.z = max(-self.max_angular_speed, min(angular_velocity, self.max_angular_speed))
-        
+        # sign steers toward the followed wall when too far, away when too close
+        cmd.angular.z = sign * max(-self.max_angular_speed,
+                                   min(angular_velocity, self.max_angular_speed))
+
         # Speed control based on front clearance
         front_dist = self.get_min_distance_in_arc(-30, 30, 2)
         if front_dist < self.slow_down_dist:
@@ -302,18 +336,18 @@ class WallFollowerController(Node):
             cmd.linear.x = self.forward_speed * speed_factor
         else:
             cmd.linear.x = self.forward_speed
-        
+
         # Reduce speed during sharp turns
         if abs(cmd.angular.z) > 0.3:
             turn_factor = 1.0 - (abs(cmd.angular.z) / self.max_angular_speed) * 0.7
             cmd.linear.x *= turn_factor
-        
+
         # Ensure minimum forward speed
         cmd.linear.x = max(0.05, cmd.linear.x)
-        
+
         # Update PID state
         self.prev_error = error
-        
+
         return cmd
 
     def pick_escape_direction(self):
@@ -418,10 +452,13 @@ class WallFollowerController(Node):
     def shutdown(self):
         """Graceful shutdown - stop robot"""
         self.get_logger().info('Shutting down - stopping robot')
-        self.cmd_pub.publish(Twist())
+        if rclpy.ok():
+            self.cmd_pub.publish(Twist())
 
 def main(args=None):
-    rclpy.init(args=args)
+    # Keep the context alive through SIGINT so the zero Twist in shutdown() is
+    # actually delivered; rclpy's own handler would invalidate it first.
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     
     node = None
     try:
@@ -436,7 +473,7 @@ def main(args=None):
         if node:
             node.shutdown()
             node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

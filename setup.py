@@ -4,6 +4,16 @@ from glob import glob
 
 package_name = 'wall_following_project'
 
+
+def recursive_files(src_dir: str) -> list:
+    out = []
+    for root, _dirs, files in os.walk(src_dir):
+        if files:
+            out.append((os.path.join('share', package_name, root),
+                        [os.path.join(root, f) for f in files]))
+    return out
+
+
 setup(
     name=package_name,
     version='1.0.0',
@@ -15,7 +25,9 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
-    ],
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*.sdf')),
+        (os.path.join('share', package_name, 'description'), glob('description/*.xacro')),
+    ] + recursive_files('models'),
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='Aung Kaung Myat',

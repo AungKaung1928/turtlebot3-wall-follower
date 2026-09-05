@@ -4,7 +4,7 @@ A ROS2 reactive wall-following controller for TurtleBot3: filtered PD control on
 ##  Prerequisites
 - [![ROS2](https://img.shields.io/badge/ROS2-Humble-blue?style=for-the-badge&logo=ros&logoColor=white)](https://docs.ros.org/en/humble/Installation.html) **ROS2 Humble**
 - [![Python](https://img.shields.io/badge/Python-3.8+-yellow?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/) **Python 3.8+**
-- [![Gazebo](https://img.shields.io/badge/Gazebo-Classic-orange?style=for-the-badge&logo=gazebo&logoColor=white)](https://classic.gazebosim.org/tutorials?tut=install_ubuntu) **Gazebo Classic**
+- [![Gazebo](https://img.shields.io/badge/Gazebo-Harmonic-orange?style=for-the-badge&logo=gazebo&logoColor=white)](https://gazebosim.org/docs/harmonic/install_ubuntu/) **Gazebo Harmonic** (gz-sim 8) via `ros-humble-ros-gzharmonic`
 - [![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04-orange?style=for-the-badge&logo=ubuntu&logoColor=white)](https://ubuntu.com/) **Ubuntu 22.04**
 ---
 ##  Project Structure
@@ -13,10 +13,17 @@ turtlebot3-wall-follower/                     # clone into <ws>/src/
 ├── package.xml                               # ROS2 package metadata
 ├── setup.py                                  # Python package configuration
 ├── config/
-│   └── wall_following_params.yaml            # Tunable parameters (PD, speeds, safety)
+│   ├── wall_following_params.yaml            # Tunable parameters (PD, speeds, safety)
+│   └── gz_bridge.yaml                        # ros_gz_bridge topics (/scan /cmd_vel /odom /tf /clock)
+├── description/
+│   └── turtlebot3_burger.urdf.xacro          # Burger + gz-sim DiffDrive / gpu_lidar plugins
+├── worlds/
+│   ├── wall_follow_world.sdf                 # 6x6 m room with partition + block (default)
+│   └── turtlebot3_world.sdf                  # Original hexagon + 9 pillars benchmark arena
+├── models/turtlebot3_world/                  # Mesh model used by turtlebot3_world.sdf
 ├── launch/
-│   ├── wall_following.launch.py              # Controller launch file
-│   └── wall_follower_gazebo.launch.py        # Full simulation launch
+│   ├── wall_following.launch.py              # Controller only
+│   └── wall_follower_gazebo.launch.py        # Gazebo Harmonic + bridge + robot + controller
 ├── rviz/
 │   └── wall_follower_config.rviz             # Visualization config
 ├── wall_following_project/
@@ -48,19 +55,23 @@ The robot maintains a **constant distance from walls** using sensor feedback wit
 ```
 ### PD Control System
 ```
-Error = Desired_Distance - Current_Wall_Distance
-Angular_Velocity = Kp × Error + Kd × (Error - Previous_Error) / dt
+alpha      = atan2(b - a·cos θ, a·sin θ)       # heading angle to the wall (two beams: side b, swung a)
+d_perp     = b · cos alpha                      # true perpendicular distance
+d_pred     = d_perp - lookahead · sin alpha     # distance after lookahead metres on this heading
+Error      = d_pred - Desired_Distance          # > 0: too far
+Angular_Velocity = ±(Kp × Error + Kd × dError/dt)   # sign steers toward the followed wall
 Where:
-  Kp = 2.0  (Proportional gain - responsiveness)
-  Kd = 0.6  (Derivative gain - smoothness)
-  dt = 0.05 (50ms control loop)
+  Kp = 2.0, Kd = 0.6, dt = 0.05, lookahead = 0.3 m, θ = 40°
 ```
+Steering on the predicted distance instead of the raw side range is what keeps
+the lock: a single side beam inflates as soon as the robot yaws toward the wall,
+so the old check declared the wall lost every time the P term steered inward.
 There is no integral term, so this is a PD controller, not a PID.
 The raw derivative is `(error - prev_error) / 0.05`, which amplifies scan noise
 20x, so it is low-pass filtered (EMA, alpha = 0.3) before the gain is applied.
 **How it works:**
 - **Error > 0** (too far from wall) → Turn toward wall
-- **Error < 0** (too close to wall) → Turn away from wall
+- **Error < 0** (too close, or converging too fast) → Turn away from wall
 - **Derivative term** prevents oscillation by damping aggressive corrections
 ### Architecture Components
 | Component | Purpose |
@@ -81,6 +92,8 @@ The raw derivative is `(error - prev_error) / 0.05`, which amplifies scan noise
 | `max_angular_speed` | 1.0 rad/s | Maximum turn rate |
 | `kp` | 2.0 | Proportional gain |
 | `kd` | 0.6 | Derivative gain (applied to the filtered derivative) |
+| `lookahead_distance` | 0.3 m | Horizon for the predicted wall distance |
+| `beam_spread_deg` | 40 | Angle between side beam and forward wall beam |
 | `emergency_stop_distance` | 0.35 m | Immediate stop threshold |
 | `slow_down_distance` | 0.80 m | Begin speed reduction |
 | `wall_min_distance` | 0.28 m | Minimum wall clearance |
@@ -96,34 +109,55 @@ is what sets the 0.5 m standoff.
 ---
 ##  Measured Performance
 
-Recorded by an independent node (not the controller) at 10 Hz, headless
-`gzserver`, `turtlebot3_world`, burger spawned at (-2.0, -0.5), 120 s per run,
-target 0.5 m. "Followed-wall distance" is `min(right, left)`, because the
-controller locks onto whichever side is nearer.
+Recorded by an independent node (not the controller) at 10 Hz, headless Gazebo
+Harmonic (`headless:=true`), target 0.5 m. "Followed-wall distance" is
+`min(right, left)` over **all** samples, including search and avoidance, because
+the controller locks onto whichever side is nearer. Contact = any scan return
+below 0.16 m (the LDS is 0.12 m from the shell).
 
-| Metric | Before fix | After fix |
-|---|---|---|
-| Path length in 120 s | 4.19 m | **10.29 m** |
-| Longest stall (net move < 5 cm) | 36.8 s | **6.8 s** |
-| Time FOLLOWING | 59.2 % | **76.6 %** |
-| Time AVOIDING | 40.8 % | **13.1 %** |
-| State changes / min | 58.0 | **13.5** |
-| Tracking RMSE | 0.599 m | **0.179 m** |
-| Std. dev. | 0.292 m | **0.172 m** |
-| Within +/-0.15 m of target | 13.6 % | **75.0 %** |
+| Metric | Room, before fixes (120 s) | Room, after (170 s) | turtlebot3_world, after (120 s) |
+|---|---|---|---|
+| Path length | 10.40 m | **23.92 m** (full lap) | **18.00 m** |
+| Time FOLLOWING | 69.9 % | **92.7 %** | **100 %** |
+| Time AVOIDING | 15.7 % | 7.3 % (corners) | 0 % |
+| Wall-lost events | 24 | **0** | **0** |
+| Collision-avoid episodes | 8 | 6 (= the 6 corners) | **0** |
+| State changes / min | 25.5 | 4.2 | **0.0** |
+| Tracking RMSE | 0.455 m | **0.139 m** | **0.066 m** |
+| Within +/-0.15 m of target | 32.5 % | **95.4 %** | **98.3 %** |
+| Contact samples | 0 | 0 | 0 |
 
-The "before" run is scored against its own configured target (1.4 m), the
-"after" run against 0.5 m; both use the identical scenario and recorder.
+Room = `worlds/wall_follow_world.sdf` (default, 6 x 6 m, partition + block), spawn
+(-2, -2), right-hand lap: south, east, north, west wall, partition north face,
+around its tip, partition south face, west wall, back to the south wall.
+turtlebot3_world spawn (-2.0, -0.5). Before the Harmonic port, the best Classic
+result in turtlebot3_world was RMSE 0.179 m / 75 % within 0.15 m.
 
 ### What was actually wrong
 
-`get_distance_at_angle()` computed `idx = (radians(angle) - angle_min) / angle_increment`
-and then **clamped** the result into `[0, n-1]`. The TurtleBot3 LDS publishes
-`angle_min = 0.0, angle_max = 2*pi`, so every negative bearing produced a negative
-index that clamped to **0 - straight ahead**. With `wall_side = 'right'` (-90 deg),
-the controller was regulating the *front* beam, not the wall. Indices are now
-wrapped modulo a full turn, which is correct for both the `0..2*pi` and the
-`-pi..+pi` conventions.
+**Single-beam wall distance (fixed 2026-09-05).** `follow_wall()` measured the
+wall as the minimum over a +/-15 deg side arc and compared that to
+`wall_lost_distance`. As soon as the P term steered toward the wall, the arc
+rotated off the wall normal and the reading inflated by 1/cos(yaw), tripping
+"wall lost" every 1-2 s and dropping the robot back into SEARCHING; it then
+drove at the wall until collision avoidance turned it away. The controller now
+takes two beams (side and 40 deg forward), solves the wall angle, and steers on
+the distance predicted `lookahead_distance` ahead. The lost check uses a
++/-45 deg arc as well, so yawing no longer counts as losing the wall. When both
+beams look past the end of a wall while the rear arc still has it (an outside
+corner), the robot arcs around the corner at the standoff radius instead of
+falling into the open-space search sweep, which used to wander into the tip.
+
+**Parameter file never loaded (fixed 2026-09-05).** The Classic launch included
+`gazebo_ros/gzserver.launch.py`, which also declares a `params_file` argument;
+launch arguments are global, so ours resolved to `''` and the node ran on the
+defaults compiled into the code. The Harmonic launch passes the file explicitly.
+
+**Scan indexing (fixed earlier).** `get_distance_at_angle()` clamped negative
+bearings to index 0, so with `angle_min = 0` the right-wall controller was
+regulating the *front* beam. Indices are now wrapped modulo a full turn, which
+is correct for both the `0..2*pi` (Classic LDS) and `-pi..+pi` (gpu_lidar)
+conventions.
 
 Three further defects were found by measurement, not by reading:
 1. `avoid_collision()` re-picked its escape direction every 50 ms, so it dithered
@@ -135,38 +169,38 @@ Three further defects were found by measurement, not by reading:
 3. Trip and clear used the same thresholds, so the state machine chattered on the
    boundary. Clearing now requires a 1.3x margin.
 
+### Known limitation
+Inside corners are handled by the AVOIDING state (front < 0.35 m, stop, turn
+away, resume), a hard stop-and-turn rather than a planned arc; it costs about
+2 s per corner. A front-arc steering term in `follow_wall()` is the planned
+improvement. The controller is a single 480-line Python node; a C++ port is the
+other open item.
+
 ---
 ##  Installation
 ```bash
-# 1. Install TurtleBot3 packages
-sudo apt update
-sudo apt install ros-humble-turtlebot3*
-# 2. Set TurtleBot3 model
-echo 'export TURTLEBOT3_MODEL=burger' >> ~/.bashrc
-source ~/.bashrc
-# 3. Clone and build workspace
-cd ~/
-git clone <your-repo-url> turtlebot3_wall_follower_ws
-cd turtlebot3_wall_follower_ws
-colcon build
-source install/setup.bash
+# 1. Gazebo Harmonic + ros_gz for Humble (packages.osrfoundation.org, see gazebosim.org/docs/harmonic/ros_installation)
+sudo apt install gz-harmonic ros-humble-ros-gzharmonic
+# 2. Robot description meshes + launch helpers
+sudo apt install ros-humble-turtlebot3-description ros-humble-xacro ros-humble-robot-state-publisher
+# 3. Clone into a workspace and build
+mkdir -p ~/wall_follower_ws/src && cd ~/wall_follower_ws/src
+git clone https://github.com/AungKaung1928/turtlebot3-wall-follower.git
+cd .. && colcon build --symlink-install && source install/setup.bash
 ```
+No `turtlebot3_gazebo` and no Gazebo Classic: the robot's Gazebo plugins live in
+`description/turtlebot3_burger.urdf.xacro` and the worlds are plain SDF 1.8.
 ---
 ##  Usage
 ### Quick Start (Single Command)
 ```bash
 ros2 launch wall_following_project wall_follower_gazebo.launch.py
 ```
-### Manual Launch (Two Terminals)
-**Terminal 1 - Gazebo:**
+Launch arguments: `world` (SDF path), `headless:=true` (server only, for WSL/CI),
+`x_pose y_pose yaw` (spawn), `params_file`. Always clear stale servers first:
+`pkill -9 -f "gz sim"`; two gz servers on one bus corrupt `/clock` and `/odom`.
+### Controller only (sim already running)
 ```bash
-export TURTLEBOT3_MODEL=burger
-ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
-```
-**Terminal 2 - Wall Follower:**
-```bash
-cd ~/turtlebot3_wall_follower_ws
-source install/setup.bash
 ros2 launch wall_following_project wall_following.launch.py
 ```
 ### RViz Visualization (Optional)
@@ -283,10 +317,9 @@ ros2 param get /wall_follower_controller use_sim_time  # Should be true
 - **Laser scan range:** 360° coverage, ~3.5m max range
 - **Angular sampling:** Front (±30°), Sides (±90°), Wide (±70°)
 ### Dependencies
-- `rclpy` - ROS2 Python client library
-- `sensor_msgs` - LaserScan message type
-- `geometry_msgs` - Twist (velocity) message type
-- `std_msgs` - String message for state publishing
+- `rclpy`, `sensor_msgs`, `geometry_msgs`, `std_msgs` - controller
+- `ros_gz_sim`, `ros_gz_bridge` (`ros-humble-ros-gzharmonic`) - Gazebo Harmonic launch + bridge
+- `xacro`, `robot_state_publisher`, `turtlebot3_description` - robot model and meshes
 ---
 ##  Resources
 - [ROS2 Humble Documentation](https://docs.ros.org/en/humble/)
