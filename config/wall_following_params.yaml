@@ -1,24 +1,30 @@
 wall_follower_controller:
   ros__parameters:
     use_sim_time: true
-    
+
     # Control parameters
-    desired_distance: 1.4           # Target distance from wall (meters)
-    forward_speed: 0.2              # Normal forward speed (m/s)
+    # turtlebot3_world is a 5x5 m arena; a 1.4 m standoff was wider than the
+    # free space between the outer wall and the inner obstacles.
+    desired_distance: 0.5           # Target distance from wall (meters)
+    forward_speed: 0.18             # Normal forward speed (m/s)
     search_speed: 0.12              # Speed while searching for wall (m/s)
-    max_angular_speed: 0.5          # Maximum rotation speed (rad/s)
-    
+    max_angular_speed: 1.0          # Maximum rotation speed (rad/s)
+
     # PID controller gains
-    kp: 1.2                         # Proportional gain
-    kd: 0.5                         # Derivative gain
-    
+    # The derivative term divides by dt=0.05, so it is 20x more sensitive than
+    # the proportional term. kd is filtered in the node; keep it modest.
+    kp: 2.0                         # Proportional gain
+    kd: 0.6                         # Derivative gain
+
     # Safety distances (meters)
-    emergency_stop_distance: 0.70   # Immediate stop distance
-    slow_down_distance: 1.0         # Start slowing down distance
-    wall_min_distance: 0.55         # Minimum acceptable wall distance
-    wall_lost_distance: 1.8         # Distance to consider wall lost
-    side_clearance: 0.5             # Minimum side obstacle clearance
-    
+    # Must satisfy: side_clearance < wall_min < desired < wall_lost
+    # and emergency_stop < slow_down.
+    emergency_stop_distance: 0.35   # Immediate stop distance
+    slow_down_distance: 0.80        # Start slowing down distance
+    wall_min_distance: 0.28         # Minimum acceptable wall distance
+    wall_lost_distance: 1.2         # Distance to consider wall lost
+    side_clearance: 0.25            # Minimum side obstacle clearance
+
     # Behavior parameters
-    search_period_cycles: 80        # Cycles before reversing search direction (20Hz)
+    search_period_cycles: 60        # Cycles before reversing search direction (20Hz)
     stuck_threshold_cycles: 3       # Cycles before declaring stuck condition

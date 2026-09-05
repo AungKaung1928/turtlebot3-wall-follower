@@ -6,7 +6,7 @@ package_name = 'wall_following_project'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='1.0.0',
     packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -18,10 +18,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='user',
-    maintainer_email='user@todo.todo',
-    description='Simple wall following robot',
-    license='TODO: License declaration',
+    maintainer='Aung Kaung Myat',
+    maintainer_email='103877301+AungKaung1928@users.noreply.github.com',
+    description='Reactive wall following for TurtleBot3 with PD control and collision avoidance',
+    license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

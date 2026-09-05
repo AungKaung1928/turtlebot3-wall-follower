@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.parameter import Parameter
+from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
@@ -29,13 +29,25 @@ class WallFollowerController(Node):
         self.wall_side = 'right'
         self.laser_data = None
         self.prev_error = 0.0
+        self.filtered_derivative = 0.0
         self.search_direction = 1
         self.state_counter = 0
+        self.resume_state = RobotState.SEARCHING
+        self.escape_dir = 1
         
         # ROS communication
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.state_pub = self.create_publisher(String, '/wall_follower/state', 10)
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.laser_callback, 10)
+        # The TurtleBot3 LDS driver publishes /scan BEST_EFFORT; a default
+        # RELIABLE subscription matches in Gazebo but receives nothing on
+        # the real robot.
+        sensor_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1)
+        self.scan_sub = self.create_subscription(
+            LaserScan, '/scan', self.laser_callback, sensor_qos)
         self.timer = self.create_timer(0.05, self.control_loop)  # 20Hz control
         
         self.get_logger().info('='*50)
@@ -106,6 +118,28 @@ class WallFollowerController(Node):
         """Store latest laser scan data"""
         self.laser_data = msg
 
+    def _angle_to_index(self, angle_deg):
+        """
+        Convert a bearing in the robot frame to a scan index.
+
+        The TurtleBot3 LDS publishes angle_min=0.0, angle_max=2*pi, so a
+        negative bearing has no direct index. Wrapping the offset modulo a
+        full turn handles that convention and the -pi..+pi convention alike.
+        """
+        scan = self.laser_data
+        n = len(scan.ranges)
+        offset = (math.radians(angle_deg) - scan.angle_min) % (2.0 * math.pi)
+        return int(round(offset / scan.angle_increment)) % n
+
+    def _range_at_index(self, idx):
+        """Return ranges[idx] if it is a usable measurement, else inf."""
+        d = self.laser_data.ranges[idx]
+        if math.isnan(d) or math.isinf(d):
+            return float('inf')
+        if self.laser_data.range_min < d < self.laser_data.range_max:
+            return d
+        return float('inf')
+
     def get_distance_at_angle(self, angle_deg, average=False):
         """
         Get distance at specified angle with optional averaging.
@@ -117,38 +151,36 @@ class WallFollowerController(Node):
         """
         if self.laser_data is None:
             return float('inf')
-        
-        angle_rad = math.radians(angle_deg)
-        idx = int((angle_rad - self.laser_data.angle_min) / self.laser_data.angle_increment)
-        
-        # Clamp index to valid range
-        idx = max(0, min(len(self.laser_data.ranges) - 1, idx))
-        
+
+        n = len(self.laser_data.ranges)
+        idx = self._angle_to_index(angle_deg)
+
         if average:
-            # Average over ±3 indices for noise reduction
-            indices = range(max(0, idx-3), min(len(self.laser_data.ranges), idx+4))
+            # Average over ±3 indices for noise reduction (wrapping at the seam)
             valid_distances = []
-            for i in indices:
-                d = self.laser_data.ranges[i]
-                if not (math.isnan(d) or math.isinf(d)) and 0.05 < d < 3.5:
+            for k in range(-3, 4):
+                d = self._range_at_index((idx + k) % n)
+                if math.isfinite(d):
                     valid_distances.append(d)
             return sum(valid_distances) / len(valid_distances) if valid_distances else float('inf')
-        else:
-            d = self.laser_data.ranges[idx]
-            if not (math.isnan(d) or math.isinf(d)) and 0.05 < d < 3.5:
-                return d
-            return float('inf')
+
+        return self._range_at_index(idx)
 
     def get_min_distance_in_arc(self, start_angle, end_angle, step=3):
         """Get minimum distance in angular range"""
         distances = [self.get_distance_at_angle(a) for a in range(start_angle, end_angle+1, step)]
         return min(distances) if distances else float('inf')
 
-    def detect_collision_threat(self):
+    def detect_collision_threat(self, margin=1.0):
         """
         Multi-zone collision detection.
+        margin scales every threshold. Clearing with a wider margin than
+        the one that tripped gives the state machine hysteresis; without
+        it the robot re-trips on the same obstacle every other cycle.
         Returns: (is_collision, front_distance)
         """
+        stop = self.emergency_stop * margin
+        side = self.side_clearance * margin
         # Critical front zone
         front_center = self.get_min_distance_in_arc(-20, 20, 2)
         front_left = self.get_min_distance_in_arc(20, 50, 3)
@@ -158,21 +190,27 @@ class WallFollowerController(Node):
         front_wide_left = self.get_min_distance_in_arc(50, 70, 5)
         front_wide_right = self.get_min_distance_in_arc(-70, -50, 5)
         
-        # Side zones
+        # Side zones. The wall currently being followed is expected to be
+        # close, so exclude it here - follow_wall() guards it with wall_min.
         right_side = self.get_min_distance_in_arc(-90, -60, 3)
         left_side = self.get_min_distance_in_arc(60, 90, 3)
+        if self.state == RobotState.FOLLOWING:
+            if self.wall_side == 'right':
+                right_side = float('inf')
+            else:
+                left_side = float('inf')
         
         min_front = min(front_center, front_left, front_right)
         
         # Check collision conditions
         collision = (
-            front_center < self.emergency_stop or
-            front_left < self.emergency_stop or
-            front_right < self.emergency_stop or
-            right_side < self.side_clearance or
-            left_side < self.side_clearance or
-            front_wide_left < 0.35 or
-            front_wide_right < 0.35
+            front_center < stop or
+            front_left < stop or
+            front_right < stop or
+            right_side < side or
+            left_side < side or
+            front_wide_left < side or
+            front_wide_right < side
         )
         
         return collision, min_front
@@ -192,6 +230,7 @@ class WallFollowerController(Node):
             self.state = RobotState.FOLLOWING
             self.state_counter = 0
             self.prev_error = 0.0  # Reset PID
+            self.filtered_derivative = 0.0
             self.get_logger().info(f'Wall detected on {self.wall_side.upper()} at {min(right_dist, left_dist):.2f}m')
             return Twist()  # Stop for one cycle before following
         
@@ -219,9 +258,12 @@ class WallFollowerController(Node):
         """
         cmd = Twist()
         
-        # Get wall distance
-        angle = -90 if self.wall_side == 'right' else 90
-        wall_dist = self.get_distance_at_angle(angle, average=True)
+        # Get wall distance: minimum over the side arc approximates the
+        # perpendicular distance even when the robot is not parallel to the wall.
+        if self.wall_side == 'right':
+            wall_dist = self.get_min_distance_in_arc(-105, -75, 3)
+        else:
+            wall_dist = self.get_min_distance_in_arc(75, 105, 3)
         
         # Lost wall? Return to search
         if wall_dist > self.wall_lost:
@@ -238,8 +280,11 @@ class WallFollowerController(Node):
         
         # PID control for wall following
         error = self.desired_distance - wall_dist
-        derivative = (error - self.prev_error) / 0.05  # 20Hz = 0.05s
-        angular_velocity = self.kp * error + self.kd * derivative
+        raw_derivative = (error - self.prev_error) / 0.05  # 20Hz = 0.05s
+        # Dividing by dt amplifies scan noise 20x, so filter before using it
+        self.filtered_derivative = (0.7 * self.filtered_derivative
+                                    + 0.3 * raw_derivative)
+        angular_velocity = self.kp * error + self.kd * self.filtered_derivative
         
         # Invert angular velocity for left wall
         if self.wall_side == 'left':
@@ -271,34 +316,42 @@ class WallFollowerController(Node):
         
         return cmd
 
+    def pick_escape_direction(self):
+        """
+        Choose which way to turn out of a collision, once, on entry.
+
+        Re-deciding this every 50ms makes the robot dither around the
+        decision boundary and never complete a turn, so the result is
+        latched in self.escape_dir for the whole avoidance episode.
+        Returns: +1 for left, -1 for right
+        """
+        if self.state == RobotState.FOLLOWING:
+            # Turn away from the wall being followed - turning into it
+            # is never the escape.
+            return 1 if self.wall_side == 'right' else -1
+
+        left_clearance = self.get_min_distance_in_arc(45, 135, 5)
+        right_clearance = self.get_min_distance_in_arc(-135, -45, 5)
+        return 1 if left_clearance >= right_clearance else -1
+
     def avoid_collision(self):
         """
         Emergency collision avoidance.
         Returns: Twist command
         """
         cmd = Twist()
-        cmd.linear.x = 0.0  # Full stop
-        
-        # Analyze escape directions
-        left_clearance = self.get_min_distance_in_arc(45, 135, 5)
-        right_clearance = self.get_min_distance_in_arc(-135, -45, 5)
-        back_left = self.get_min_distance_in_arc(135, 180, 5)
-        back_right = self.get_min_distance_in_arc(-180, -135, 5)
-        
-        # Choose best escape direction
-        if left_clearance > right_clearance and left_clearance > 0.8:
-            cmd.angular.z = 0.8  # Turn left
-        elif right_clearance > 0.8:
-            cmd.angular.z = -0.8  # Turn right
-        elif back_left > back_right and back_left > 0.6:
-            cmd.angular.z = 0.8
-        elif back_right > 0.6:
-            cmd.angular.z = -0.8
-        else:
-            # No clear escape - rotate in place
-            self.state_counter += 1
-            cmd.angular.z = 0.6 if (self.state_counter // 20) % 2 == 0 else -0.6
-        
+        self.state_counter += 1
+
+        # Rotating in place cannot help when every heading is blocked, which
+        # is how the robot wedges itself into a corner. Back off once the
+        # turn has clearly failed, but only if there is room behind.
+        cmd.linear.x = 0.0
+        if self.state_counter > self.stuck_threshold * 20:
+            rear = self.get_min_distance_in_arc(150, 210, 5)
+            if rear > 0.30:
+                cmd.linear.x = -0.06
+
+        cmd.angular.z = 0.8 * self.escape_dir
         return cmd
 
     def control_loop(self):
@@ -306,12 +359,17 @@ class WallFollowerController(Node):
         if self.laser_data is None:
             return
         
-        # Collision detection takes priority
-        collision_detected, front_dist = self.detect_collision_threat()
+        # Collision detection takes priority. Clearing needs a wider
+        # margin than tripping, otherwise the robot oscillates on the
+        # threshold instead of escaping.
+        margin = 1.3 if self.state == RobotState.AVOIDING else 1.0
+        collision_detected, front_dist = self.detect_collision_threat(margin)
         
         if collision_detected:
             if self.state != RobotState.AVOIDING:
                 self.get_logger().warn(f'COLLISION THREAT! Front: {front_dist:.2f}m - Avoiding')
+                self.resume_state = self.state
+                self.escape_dir = self.pick_escape_direction()
                 self.state = RobotState.AVOIDING
                 self.state_counter = 0
             
@@ -319,9 +377,13 @@ class WallFollowerController(Node):
         else:
             # Exit avoidance state if collision cleared
             if self.state == RobotState.AVOIDING:
-                self.get_logger().info('Collision cleared - resuming normal operation')
-                self.state = RobotState.SEARCHING
+                # Resume following if we still have the wall; a corner should
+                # not throw away the lock and restart the search.
+                self.state = self.resume_state
+                self.get_logger().info(f'Collision cleared - resuming {self.state.name}')
                 self.state_counter = 0
+                self.prev_error = 0.0
+                self.filtered_derivative = 0.0
             
             # Execute state-specific behavior
             if self.state == RobotState.SEARCHING:
@@ -332,12 +394,15 @@ class WallFollowerController(Node):
                 cmd = Twist()
         
         # Final safety clamp
-        cmd.linear.x = max(0.0, min(cmd.linear.x, self.forward_speed))
+        # Lower bound is negative so avoid_collision can back out of a
+        # corner; every other state only ever commands forward motion.
+        cmd.linear.x = max(-0.08, min(cmd.linear.x, self.forward_speed))
         cmd.angular.z = max(-self.max_angular_speed, min(cmd.angular.z, self.max_angular_speed))
         
-        # Emergency brake for immediate front obstacles
+        # Emergency brake for immediate front obstacles. Must sit below
+        # emergency_stop_distance or it pre-empts the avoid behaviour.
         immediate_front = self.get_min_distance_in_arc(-15, 15, 1)
-        if immediate_front < 0.4:
+        if immediate_front < self.emergency_stop * 0.7 and cmd.linear.x > 0.0:
             cmd.linear.x = 0.0
         
         # Publish commands and state
