@@ -27,3 +27,8 @@ jobs:
         run: |
           source install/setup.bash
           ros2 pkg prefix wall_following_project
+      - name: Node test over real topics
+        run: |
+          source install/setup.bash
+          cd src/wall_following_project
+          python3 -m pytest test/test_node_topics.py -v
