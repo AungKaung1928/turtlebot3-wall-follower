@@ -16,6 +16,8 @@ class RobotState(Enum):
     AVOIDING = 3
 
 class WallFollowerController(Node):
+    SCAN_TIMEOUT = 0.5  # s
+
     def __init__(self):
         super().__init__('wall_follower_controller')
         
@@ -122,6 +124,7 @@ class WallFollowerController(Node):
     def laser_callback(self, msg):
         """Store latest laser scan data"""
         self.laser_data = msg
+        self.last_scan_time = self.get_clock().now()
 
     def _angle_to_index(self, angle_deg):
         """
@@ -392,7 +395,15 @@ class WallFollowerController(Node):
         """Main control loop - state machine execution"""
         if self.laser_data is None:
             return
-        
+
+        # A stale scan is no scan: stop instead of driving on old data (LiDAR unplugged, driver crash).
+        # The LDS publishes at ~5 Hz, so 0.5 s tolerates one or two dropped scans.
+        age = (self.get_clock().now() - self.last_scan_time).nanoseconds * 1e-9
+        if age > self.SCAN_TIMEOUT:
+            self.cmd_pub.publish(Twist())
+            self.get_logger().warn(f'No /scan for {age:.1f} s: stopped', throttle_duration_sec=2.0)
+            return
+
         # Collision detection takes priority. Clearing needs a wider
         # margin than tripping, otherwise the robot oscillates on the
         # threshold instead of escaping.
