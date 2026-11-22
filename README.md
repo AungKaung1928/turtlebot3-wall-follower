@@ -42,6 +42,8 @@ ros2 launch wall_following_project wall_follower_gazebo.launch.py   # Gazebo ope
 
 Launch arguments: `world` (SDF path), `headless:=true` (server only, for WSL/CI), `x_pose y_pose yaw` (spawn), `params_file`. Clear stale servers first (`pkill -9 -f "gz sim"`): two gz servers on one bus corrupt `/clock` and `/odom`. Controller only, sim already running: `ros2 launch wall_following_project wall_following.launch.py`. RViz: `rviz2 -d $(ros2 pkg prefix wall_following_project)/share/wall_following_project/rviz/wall_follower_config.rviz`.
 
+Without Gazebo: `python3 -m pytest test/test_node_topics.py` (after `source install/setup.bash`) runs the node against synthetic scans over real topics: open space keeps searching, a wall on the right starts following, an obstacle ahead triggers avoidance with no forward motion. CI runs it in `ros:humble` on every push.
+
 ## Limits
 
 Inside corners are handled by the AVOIDING state (front < 0.35 m, stop, turn
