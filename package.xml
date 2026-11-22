@@ -4,7 +4,7 @@
   <name>wall_following_project</name>
   <version>1.0.0</version>
   <description>Reactive wall following for TurtleBot3 in Gazebo Harmonic: filtered PD control, 3-state FSM, collision avoidance</description>
-  <maintainer email="103877301+AungKaung1928@users.noreply.github.com">Aung Kaung Myat</maintainer>
+  <maintainer email="dev@example.com">Developer</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
