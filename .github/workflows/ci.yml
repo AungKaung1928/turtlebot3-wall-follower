@@ -39,6 +39,7 @@ jobs:
           cd src/wall_following_project
           SCENE_CSV=$GITHUB_WORKSPACE/scenes.csv launch_test test/test_launch_scenes.py
           python3 scripts/plot_scenes.py $GITHUB_WORKSPACE/scenes.csv $GITHUB_WORKSPACE/scenes.svg "Python wall follower, launch test scenes"
+          launch_test test/test_launch_stale_scan.py
       - name: Upload the scene trace
         uses: actions/upload-artifact@v4
         with:
