@@ -32,3 +32,8 @@ jobs:
           source install/setup.bash
           cd src/wall_following_project
           python3 -m pytest test/test_node_topics.py -v
+      - name: Launch test (node as its own process, shipped params)
+        run: |
+          source install/setup.bash
+          cd src/wall_following_project
+          launch_test test/test_launch_scenes.py
