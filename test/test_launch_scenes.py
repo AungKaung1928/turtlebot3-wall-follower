@@ -21,6 +21,7 @@ import rclpy
 from ament_index_python.packages import get_package_share_directory
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 
 PARAMS = os.path.join(
@@ -72,12 +73,26 @@ class TestScenes(unittest.TestCase):
         self.probe.create_subscription(
             String, '/wall_follower/state', lambda m: self.states.append(m.data), 10)
         self.pub = self.probe.create_publisher(LaserScan, '/scan', qos_profile_sensor_data)
+        # Optional trace for scripts/plot_scenes.py: (t, scene, state, v, w) per /cmd_vel message.
+        self.trace, self.t0, self.scene, self.state = [], time.monotonic(), '', ''
+        self.probe.create_subscription(Twist, '/cmd_vel', self._on_cmd, 10)
+
+    def _on_cmd(self, m):
+        self.trace.append((time.monotonic() - self.t0, self.scene, self.states[-1] if self.states else '',
+                           m.linear.x, m.angular.z))
 
     def tearDown(self):
         self.probe.destroy_node()
 
-    def drive(self, scan, until_state, timeout=10.0):
+    def hold(self, scan, seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            self.pub.publish(scan)
+            rclpy.spin_once(self.probe, timeout_sec=0.05)
+
+    def drive(self, scan, until_state, timeout=10.0, scene=''):
         """Publish scan at ~20 Hz until the node reports until_state; return the time taken."""
+        self.scene = scene
         self.states.clear()
         start = time.monotonic()
         while time.monotonic() - start < timeout:
@@ -89,11 +104,23 @@ class TestScenes(unittest.TestCase):
 
     def test_scene_sequence(self):
         self.drive(OPEN, 'SEARCHING', timeout=20.0)  # first wait also covers node start-up
-        self.drive(WALL_RIGHT, 'FOLLOWING')
-        self.drive(WALL_RIGHT_OBSTACLE_AHEAD, 'AVOIDING')
+        self.trace.clear()
+        self.t0 = time.monotonic()
+        self.hold(OPEN, 1.0)
+        self.drive(WALL_RIGHT, 'FOLLOWING', scene='wall right')
+        self.hold(WALL_RIGHT, 1.0)
+        self.drive(WALL_RIGHT_OBSTACLE_AHEAD, 'AVOIDING', scene='obstacle ahead')
+        self.hold(WALL_RIGHT_OBSTACLE_AHEAD, 1.0)
         # Once the obstacle is gone the node resumes the wall it had, no new search.
-        self.drive(WALL_RIGHT, 'FOLLOWING')
+        self.drive(WALL_RIGHT, 'FOLLOWING', scene='obstacle gone')
         self.assertNotIn('SEARCHING', self.states)
+        self.hold(WALL_RIGHT, 1.0)
+        path = os.environ.get('SCENE_CSV')
+        if path:
+            with open(path, 'w') as f:
+                f.write('t,scene,state,v,w\n')
+                for t, scene, state, v, w in self.trace:
+                    f.write(f'{t:.3f},{scene or "open"},{state},{v:.4f},{w:.4f}\n')
 
 
 @launch_testing.post_shutdown_test()
