@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 388" font-family="Helvetica, Arial, sans-serif" font-size="12">
+<rect width="640" height="388" fill="#ffffff"/>
+<text x="56" y="18" fill="#10161e" font-weight="700">Python wall follower, launch test scenes</text>
+<rect x="62.7" y="48" width="126.4" height="276" fill="#f3f6f8"/>
+<text x="125.8" y="32" text-anchor="middle" fill="#3f4d58">open</text>
+<text x="125.8" y="44" text-anchor="middle" fill="#005f73" font-family="ui-monospace, monospace" font-size="11">SEARCHING</text>
+<rect x="195.7" y="48" width="139.7" height="276" fill="#ffffff"/>
+<text x="265.5" y="32" text-anchor="middle" fill="#3f4d58">wall right</text>
+<text x="265.5" y="44" text-anchor="middle" fill="#005f73" font-family="ui-monospace, monospace" font-size="11">FOLLOWING</text>
+<rect x="342.0" y="48" width="139.7" height="276" fill="#f3f6f8"/>
+<text x="411.8" y="32" text-anchor="middle" fill="#3f4d58">obstacle ahead</text>
+<text x="411.8" y="44" text-anchor="middle" fill="#005f73" font-family="ui-monospace, monospace" font-size="11">AVOIDING</text>
+<rect x="488.3" y="48" width="139.7" height="276" fill="#ffffff"/>
+<text x="558.2" y="32" text-anchor="middle" fill="#3f4d58">obstacle gone</text>
+<text x="558.2" y="44" text-anchor="middle" fill="#005f73" font-family="ui-monospace, monospace" font-size="11">FOLLOWING</text>
+<rect x="56" y="48" width="572" height="120" fill="none" stroke="#c9d1d9"/>
+<line x1="56" y1="108.0" x2="628" y2="108.0" stroke="#c9d1d9" stroke-dasharray="3 3"/>
+<text x="50" y="58.0" text-anchor="end" fill="#6b7785">0.18</text>
+<text x="50" y="168.0" text-anchor="end" fill="#6b7785">-0.18</text>
+<text x="50" y="112.0" text-anchor="end" fill="#6b7785">0</text>
+<text x="62" y="62" fill="#10161e">linear.x (m/s)</text>
+<polyline points="62.7,68.0 69.3,68.0 76.0,68.0 82.6,68.0 89.3,68.0 95.9,68.0 102.6,68.0 109.2,68.0 115.9,68.0 122.5,68.0 129.2,68.0 135.8,68.0 142.5,68.0 149.1,68.0 155.8,68.0 162.4,68.0 169.1,68.0 175.7,68.0 182.4,68.0 189.0,68.0 195.7,68.0 202.5,108.0 209.0,64.5 215.6,61.3 222.3,48.0 228.9,48.0 235.6,48.0 242.2,48.0 248.9,48.0 255.5,48.0 262.2,48.0 268.8,48.0 275.5,48.0 282.1,48.0 288.8,48.0 295.4,48.0 302.1,48.0 308.7,48.0 315.4,48.0 322.0,48.0 328.7,48.0 335.3,48.0 342.0,48.0 348.8,108.0 355.3,108.0 362.0,108.0 368.6,108.0 375.3,108.0 381.9,108.0 388.6,108.0 395.2,108.0 401.9,108.0 408.5,108.0 415.2,108.0 421.8,108.0 428.5,108.0 435.1,108.0 441.8,108.0 448.4,108.0 455.1,108.0 461.7,108.0 468.4,108.0 475.0,108.0 481.7,108.0 488.3,108.0 495.0,64.5 501.6,61.3 508.3,48.0 514.9,48.0 521.6,48.0 528.2,48.0 534.9,48.0 541.5,48.0 548.2,48.0 554.8,48.0 561.5,48.0 568.1,48.0 574.8,48.0 581.4,48.0 588.1,48.0 594.7,48.0 601.4,48.0 608.0,48.0 614.7,48.0 621.3,48.0 628.0,48.0" fill="none" stroke="#005f73" stroke-width="2"/>
+<rect x="56" y="204" width="572" height="120" fill="none" stroke="#c9d1d9"/>
+<line x1="56" y1="264.0" x2="628" y2="264.0" stroke="#c9d1d9" stroke-dasharray="3 3"/>
+<text x="50" y="214.0" text-anchor="end" fill="#6b7785">0.8</text>
+<text x="50" y="324.0" text-anchor="end" fill="#6b7785">-0.8</text>
+<text x="50" y="268.0" text-anchor="end" fill="#6b7785">0</text>
+<text x="62" y="218" fill="#10161e">angular.z (rad/s)</text>
+<polyline points="62.7,245.2 69.3,245.2 76.0,245.2 82.6,245.2 89.3,245.2 95.9,245.2 102.6,245.2 109.2,245.2 115.9,245.2 122.5,245.2 129.2,245.2 135.8,245.2 142.5,245.2 149.1,245.2 155.8,245.2 162.4,245.2 169.1,245.2 175.7,245.2 182.4,245.2 189.0,245.2 195.7,245.2 202.5,264.0 209.0,293.5 215.6,287.8 222.3,283.8 228.9,281.0 235.6,279.1 242.2,277.7 248.9,276.8 255.5,276.1 262.2,275.6 268.8,275.3 275.5,275.1 282.1,274.9 288.8,274.8 295.4,274.7 302.1,274.7 308.7,274.6 315.4,274.6 322.0,274.6 328.7,274.6 335.3,274.6 342.0,274.6 348.8,204.0 355.3,204.0 362.0,204.0 368.6,204.0 375.3,204.0 381.9,204.0 388.6,204.0 395.2,204.0 401.9,204.0 408.5,204.0 415.2,204.0 421.8,204.0 428.5,204.0 435.1,204.0 441.8,204.0 448.4,204.0 455.1,204.0 461.7,204.0 468.4,204.0 475.0,204.0 481.7,204.0 488.3,204.0 495.0,293.5 501.6,287.8 508.3,283.8 514.9,281.0 521.6,279.1 528.2,277.7 534.9,276.8 541.5,276.1 548.2,275.6 554.8,275.3 561.5,275.1 568.1,274.9 574.8,274.8 581.4,274.7 588.1,274.7 594.7,274.6 601.4,274.6 608.0,274.6 614.7,274.6 621.3,274.6 628.0,274.6" fill="none" stroke="#005f73" stroke-width="2"/>
+<text x="56.0" y="340" text-anchor="middle" fill="#6b7785">0</text>
+<text x="189.0" y="340" text-anchor="middle" fill="#6b7785">1</text>
+<text x="322.0" y="340" text-anchor="middle" fill="#6b7785">2</text>
+<text x="455.1" y="340" text-anchor="middle" fill="#6b7785">3</text>
+<text x="588.1" y="340" text-anchor="middle" fill="#6b7785">4</text>
+<text x="342" y="356" text-anchor="middle" fill="#6b7785">seconds; 86 /cmd_vel messages from the CI launch test, synthetic scans, no dynamics</text>
+</svg>

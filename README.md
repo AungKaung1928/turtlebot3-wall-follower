@@ -44,6 +44,10 @@ Launch arguments: `world` (SDF path), `headless:=true` (server only, for WSL/CI)
 
 Without Gazebo: `python3 -m pytest test/test_node_topics.py` (after `source install/setup.bash`) runs the node against synthetic scans over real topics: open space keeps searching, a wall on the right starts following, an obstacle ahead triggers avoidance with no forward motion. `launch_test test/test_launch_scenes.py` starts the installed node as its own process with the shipped parameter file and checks it resumes following after an obstacle clears, then exits cleanly. CI runs both in `ros:humble` on every push.
 
+![/cmd_vel from the CI launch test: searching, following a wall on the right, stopping and turning at an obstacle, resuming](docs/scenes.svg)
+
+What the node commands in each launch-test scene (CI run of a8b333f, CSV artifact plotted by `scripts/plot_scenes.py`): synthetic scans, no robot motion, so it shows the state machine and control outputs, not driving quality.
+
 ## Limits
 
 Inside corners are handled by the AVOIDING state (front < 0.35 m, stop, turn
