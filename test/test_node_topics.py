@@ -1,4 +1,5 @@
-"""Node-level integration test: the real controller node, real ROS 2 topics.
+"""
+Node-level integration test: the real controller node, real ROS 2 topics.
 
 A probe node publishes a synthetic TurtleBot3 LDS scan on /scan (best-effort, as the
 real driver does) and records /cmd_vel and /wall_follower/state.

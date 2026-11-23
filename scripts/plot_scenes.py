@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""plot_scenes.py <scenes.csv> <out.svg> [title]: /cmd_vel over time from the launch test
-(SCENE_CSV): linear speed and angular rate, with the synthetic scan scene and the node's
-state as bands.
-Standard library only."""
+"""
+Plot /cmd_vel over time from the launch test.
+
+plot_scenes.py <scenes.csv> <out.svg> [title], CSV from SCENE_CSV: linear speed and angular
+rate, with the synthetic scan scene and the node's state as bands. Standard library only.
+"""
 import csv
 import sys
 

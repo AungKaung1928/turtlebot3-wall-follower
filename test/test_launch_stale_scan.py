@@ -1,6 +1,9 @@
-"""Launch test: when /scan stops (LiDAR unplugged, driver crash) the node must stop the robot,
-not keep driving on the last scan. The installed node with the shipped params follows a wall on
-synthetic scans, then the scans stop; within about 1 s every /cmd_vel must be zero.
+"""
+Launch test: when /scan stops the node must stop the robot.
+
+LiDAR unplugged or driver crash: the node must not keep driving on the last scan. The
+installed node with the shipped params follows a wall on synthetic scans, then the scans
+stop; within about 1 s every /cmd_vel must be zero.
 Run: launch_test test/test_launch_stale_scan.py (after sourcing the workspace).
 """
 import math

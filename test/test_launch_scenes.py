@@ -1,4 +1,5 @@
-"""Launch test: the installed node runs as its own process with the shipped parameter file.
+"""
+Launch test: the installed node runs as its own process with the shipped parameter file.
 
 The test process publishes synthetic TurtleBot3 LDS scans on /scan and follows
 /wall_follower/state through one scene sequence:

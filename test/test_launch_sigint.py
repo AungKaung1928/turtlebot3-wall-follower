@@ -1,7 +1,10 @@
-"""Launch test: Ctrl+C stops the robot. The installed node follows a wall on synthetic scans; the
-test sends SIGINT to the node process while scans keep coming. The last /cmd_vel it sends must be
-zero (main() keeps the context alive through SIGINT so shutdown()'s stop is delivered).
-Run: launch_test test/test_launch_stale_scan.py (after sourcing the workspace).
+"""
+Launch test: Ctrl+C stops the robot.
+
+The installed node follows a wall on synthetic scans; the test sends SIGINT to the node
+process while scans keep coming. The last /cmd_vel it sends must be zero (main() keeps the
+context alive through SIGINT so shutdown()'s stop is delivered).
+Run: launch_test test/test_launch_sigint.py (after sourcing the workspace).
 """
 import math
 import os

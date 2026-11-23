@@ -11,7 +11,8 @@ from enum import Enum
 
 
 class RobotState(Enum):
-    """Explicit state machine for behavior clarity"""
+    """Explicit state machine for behavior clarity."""
+
     SEARCHING = 1
     FOLLOWING = 2
     AVOIDING = 3
@@ -62,7 +63,7 @@ class WallFollowerController(Node):
         self.get_logger().info('='*50)
 
     def _declare_and_validate_parameters(self):
-        """Declare parameters with type checking and validation"""
+        """Declare parameters with type checking and validation."""
         # Control parameters
         self.declare_parameter('desired_distance', 0.6)
         self.declare_parameter('forward_speed', 0.20)
@@ -85,7 +86,7 @@ class WallFollowerController(Node):
         self.declare_parameter('stuck_threshold_cycles', 3)
 
     def _load_parameters(self):
-        """Load and validate parameters with safety checks"""
+        """Load and validate parameters with safety checks."""
         # Control parameters
         self.desired_distance = self._get_validated_param('desired_distance', 0.3, 1.5)
         self.forward_speed = self._get_validated_param('forward_speed', 0.05, 0.5)
@@ -113,7 +114,7 @@ class WallFollowerController(Node):
             self.emergency_stop = self.slow_down_dist * 0.7
 
     def _get_validated_param(self, name, min_val, max_val):
-        """Get parameter with range validation"""
+        """Get parameter with range validation."""
         value = self.get_parameter(name).value
         if not (min_val <= value <= max_val):
             self.get_logger().error(
@@ -124,7 +125,7 @@ class WallFollowerController(Node):
         return value
 
     def laser_callback(self, msg):
-        """Store latest laser scan data"""
+        """Store latest laser scan data."""
         self.laser_data = msg
         self.last_scan_time = self.get_clock().now()
 
@@ -153,11 +154,10 @@ class WallFollowerController(Node):
     def get_distance_at_angle(self, angle_deg, average=False):
         """
         Get distance at specified angle with optional averaging.
-        Args:
-            angle_deg: Angle in degrees (0=front, -90=right, 90=left)
-            average: If True, average over ±3 indices
-        Returns:
-            Distance in meters, or inf if no valid reading
+
+        angle_deg: angle in degrees (0 = front, -90 = right, 90 = left).
+        average: if True, average over ±3 indices.
+        Returns the distance in meters, or inf if there is no valid reading.
         """
         if self.laser_data is None:
             return float('inf')
@@ -177,13 +177,14 @@ class WallFollowerController(Node):
         return self._range_at_index(idx)
 
     def get_min_distance_in_arc(self, start_angle, end_angle, step=3):
-        """Get minimum distance in angular range"""
+        """Get minimum distance in angular range."""
         distances = [self.get_distance_at_angle(a) for a in range(start_angle, end_angle+1, step)]
         return min(distances) if distances else float('inf')
 
     def detect_collision_threat(self, margin=1.0):
         """
         Multi-zone collision detection.
+
         margin scales every threshold. Clearing with a wider margin than
         the one that tripped gives the state machine hysteresis; without
         it the robot re-trips on the same obstacle every other cycle.
@@ -228,7 +229,8 @@ class WallFollowerController(Node):
     def search_for_wall(self):
         """
         Search behavior: rotate to find wall.
-        Returns: Twist command
+
+        Returns: Twist command.
         """
         # Check for walls on both sides
         right_dist = self.get_distance_at_angle(-90, average=True)
@@ -286,7 +288,8 @@ class WallFollowerController(Node):
     def follow_wall(self):
         """
         Wall following with PD control on the look-ahead wall distance.
-        Returns: Twist command
+
+        Returns: Twist command.
         """
         cmd = Twist()
         sign = -1 if self.wall_side == 'right' else 1
@@ -379,7 +382,8 @@ class WallFollowerController(Node):
     def avoid_collision(self):
         """
         Emergency collision avoidance.
-        Returns: Twist command
+
+        Returns: Twist command.
         """
         cmd = Twist()
         self.state_counter += 1
@@ -397,7 +401,7 @@ class WallFollowerController(Node):
         return cmd
 
     def control_loop(self):
-        """Main control loop - state machine execution"""
+        """Run one control cycle: state machine step."""
         if self.laser_data is None:
             return
 
@@ -461,13 +465,13 @@ class WallFollowerController(Node):
         self.publish_state()
 
     def publish_state(self):
-        """Publish current state for debugging"""
+        """Publish current state for debugging."""
         state_msg = String()
         state_msg.data = self.state.name
         self.state_pub.publish(state_msg)
 
     def shutdown(self):
-        """Graceful shutdown - stop robot"""
+        """Graceful shutdown - stop robot."""
         self.get_logger().info('Shutting down - stopping robot')
         if rclpy.ok():
             self.cmd_pub.publish(Twist())

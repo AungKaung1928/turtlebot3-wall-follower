@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""TurtleBot3 burger + wall follower in Gazebo Harmonic (gz-sim 8) via ros_gz.
+"""
+TurtleBot3 burger + wall follower in Gazebo Harmonic (gz-sim 8) via ros_gz.
 
 Replaces the Gazebo Classic turtlebot3_gazebo path. The sim side is pure gz:
 DiffDrive + gpu_lidar system plugins in description/turtlebot3_burger.urdf.xacro,
