@@ -9,24 +9,26 @@ from std_msgs.msg import String
 import math
 from enum import Enum
 
+
 class RobotState(Enum):
     """Explicit state machine for behavior clarity"""
     SEARCHING = 1
     FOLLOWING = 2
     AVOIDING = 3
 
+
 class WallFollowerController(Node):
     SCAN_TIMEOUT = 0.5  # s
 
     def __init__(self):
         super().__init__('wall_follower_controller')
-        
+
         # Declare all parameters with defaults and validation
         self._declare_and_validate_parameters()
-        
+
         # Load validated parameters
         self._load_parameters()
-        
+
         # State machine
         self.state = RobotState.SEARCHING
         self.wall_side = 'right'
@@ -37,7 +39,7 @@ class WallFollowerController(Node):
         self.state_counter = 0
         self.resume_state = RobotState.SEARCHING
         self.escape_dir = 1
-        
+
         # ROS communication
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.state_pub = self.create_publisher(String, '/wall_follower/state', 10)
@@ -52,7 +54,7 @@ class WallFollowerController(Node):
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.laser_callback, sensor_qos)
         self.timer = self.create_timer(0.05, self.control_loop)  # 20Hz control
-        
+
         self.get_logger().info('='*50)
         self.get_logger().info('Wall Follower Controller Initialized')
         self.get_logger().info(f'Target wall distance: {self.desired_distance}m')
@@ -70,14 +72,14 @@ class WallFollowerController(Node):
         self.declare_parameter('kd', 0.7)
         self.declare_parameter('lookahead_distance', 0.3)
         self.declare_parameter('beam_spread_deg', 40.0)
-        
+
         # Safety parameters
         self.declare_parameter('emergency_stop_distance', 0.55)
         self.declare_parameter('slow_down_distance', 0.8)
         self.declare_parameter('wall_min_distance', 0.45)
         self.declare_parameter('wall_lost_distance', 1.5)
         self.declare_parameter('side_clearance', 0.4)
-        
+
         # Behavior parameters
         self.declare_parameter('search_period_cycles', 60)
         self.declare_parameter('stuck_threshold_cycles', 3)
@@ -93,18 +95,18 @@ class WallFollowerController(Node):
         self.kd = self._get_validated_param('kd', 0.0, 2.0)
         self.lookahead = self._get_validated_param('lookahead_distance', 0.1, 1.0)
         self.beam_spread_deg = self._get_validated_param('beam_spread_deg', 20.0, 70.0)
-        
+
         # Safety parameters
         self.emergency_stop = self._get_validated_param('emergency_stop_distance', 0.2, 1.0)
         self.slow_down_dist = self._get_validated_param('slow_down_distance', 0.3, 1.5)
         self.wall_min = self._get_validated_param('wall_min_distance', 0.2, 0.8)
         self.wall_lost = self._get_validated_param('wall_lost_distance', 0.8, 3.0)
         self.side_clearance = self._get_validated_param('side_clearance', 0.2, 0.8)
-        
+
         # Behavior parameters
         self.search_period = self._get_validated_param('search_period_cycles', 20, 200)
         self.stuck_threshold = self._get_validated_param('stuck_threshold_cycles', 2, 10)
-        
+
         # Cross-validation
         if self.emergency_stop >= self.slow_down_dist:
             self.get_logger().warn('emergency_stop >= slow_down_distance! Auto-correcting.')
@@ -193,11 +195,11 @@ class WallFollowerController(Node):
         front_center = self.get_min_distance_in_arc(-20, 20, 2)
         front_left = self.get_min_distance_in_arc(20, 50, 3)
         front_right = self.get_min_distance_in_arc(-50, -20, 3)
-        
+
         # Wide front zone
         front_wide_left = self.get_min_distance_in_arc(50, 70, 5)
         front_wide_right = self.get_min_distance_in_arc(-70, -50, 5)
-        
+
         # Side zones. The wall currently being followed is expected to be
         # close, so exclude it here - follow_wall() guards it with wall_min.
         right_side = self.get_min_distance_in_arc(-90, -60, 3)
@@ -207,9 +209,9 @@ class WallFollowerController(Node):
                 right_side = float('inf')
             else:
                 left_side = float('inf')
-        
+
         min_front = min(front_center, front_left, front_right)
-        
+
         # Check collision conditions
         collision = (
             front_center < stop or
@@ -220,7 +222,7 @@ class WallFollowerController(Node):
             front_wide_left < side or
             front_wide_right < side
         )
-        
+
         return collision, min_front
 
     def search_for_wall(self):
@@ -231,7 +233,7 @@ class WallFollowerController(Node):
         # Check for walls on both sides
         right_dist = self.get_distance_at_angle(-90, average=True)
         left_dist = self.get_distance_at_angle(90, average=True)
-        
+
         # Found wall? Switch to following
         if right_dist < self.wall_lost or left_dist < self.wall_lost:
             self.wall_side = 'right' if right_dist < left_dist else 'left'
@@ -239,24 +241,26 @@ class WallFollowerController(Node):
             self.state_counter = 0
             self.prev_error = 0.0  # Reset PID
             self.filtered_derivative = 0.0
-            self.get_logger().info(f'Wall detected on {self.wall_side.upper()} at {min(right_dist, left_dist):.2f}m')
+            self.get_logger().info(
+                f'Wall detected on {self.wall_side.upper()} at {min(right_dist, left_dist):.2f}m')
             return Twist()  # Stop for one cycle before following
-        
+
         # No wall found - continue searching
         cmd = Twist()
         front_dist = self.get_min_distance_in_arc(-25, 25, 2)
-        
+
         # Adjust speed based on front clearance
-        cmd.linear.x = self.search_speed if front_dist > self.slow_down_dist else self.search_speed * 0.4
-        
+        cmd.linear.x = (self.search_speed if front_dist > self.slow_down_dist
+                        else self.search_speed * 0.4)
+
         # Oscillating search pattern
         self.state_counter += 1
         if self.state_counter > self.search_period:
             self.search_direction *= -1
             self.state_counter = 0
-        
+
         cmd.angular.z = 0.25 * self.search_direction
-        
+
         return cmd
 
     def _wall_geometry(self):
@@ -334,7 +338,8 @@ class WallFollowerController(Node):
         front_dist = self.get_min_distance_in_arc(-30, 30, 2)
         if front_dist < self.slow_down_dist:
             # Linear interpolation between emergency_stop and slow_down_dist
-            speed_factor = (front_dist - self.emergency_stop) / (self.slow_down_dist - self.emergency_stop)
+            speed_factor = ((front_dist - self.emergency_stop)
+                            / (self.slow_down_dist - self.emergency_stop))
             speed_factor = max(0.2, min(1.0, speed_factor))
             cmd.linear.x = self.forward_speed * speed_factor
         else:
@@ -396,7 +401,8 @@ class WallFollowerController(Node):
         if self.laser_data is None:
             return
 
-        # A stale scan is no scan: stop instead of driving on old data (LiDAR unplugged, driver crash).
+        # A stale scan is no scan: stop instead of driving on old data
+        # (LiDAR unplugged, driver crash).
         # The LDS publishes at ~5 Hz, so 0.5 s tolerates one or two dropped scans.
         age = (self.get_clock().now() - self.last_scan_time).nanoseconds * 1e-9
         if age > self.SCAN_TIMEOUT:
@@ -409,7 +415,7 @@ class WallFollowerController(Node):
         # threshold instead of escaping.
         margin = 1.3 if self.state == RobotState.AVOIDING else 1.0
         collision_detected, front_dist = self.detect_collision_threat(margin)
-        
+
         if collision_detected:
             if self.state != RobotState.AVOIDING:
                 self.get_logger().warn(f'COLLISION THREAT! Front: {front_dist:.2f}m - Avoiding')
@@ -417,7 +423,7 @@ class WallFollowerController(Node):
                 self.escape_dir = self.pick_escape_direction()
                 self.state = RobotState.AVOIDING
                 self.state_counter = 0
-            
+
             cmd = self.avoid_collision()
         else:
             # Exit avoidance state if collision cleared
@@ -429,7 +435,7 @@ class WallFollowerController(Node):
                 self.state_counter = 0
                 self.prev_error = 0.0
                 self.filtered_derivative = 0.0
-            
+
             # Execute state-specific behavior
             if self.state == RobotState.SEARCHING:
                 cmd = self.search_for_wall()
@@ -437,19 +443,19 @@ class WallFollowerController(Node):
                 cmd = self.follow_wall()
             else:
                 cmd = Twist()
-        
+
         # Final safety clamp
         # Lower bound is negative so avoid_collision can back out of a
         # corner; every other state only ever commands forward motion.
         cmd.linear.x = max(-0.08, min(cmd.linear.x, self.forward_speed))
         cmd.angular.z = max(-self.max_angular_speed, min(cmd.angular.z, self.max_angular_speed))
-        
+
         # Emergency brake for immediate front obstacles. Must sit below
         # emergency_stop_distance or it pre-empts the avoid behaviour.
         immediate_front = self.get_min_distance_in_arc(-15, 15, 1)
         if immediate_front < self.emergency_stop * 0.7 and cmd.linear.x > 0.0:
             cmd.linear.x = 0.0
-        
+
         # Publish commands and state
         self.cmd_pub.publish(cmd)
         self.publish_state()
@@ -466,11 +472,12 @@ class WallFollowerController(Node):
         if rclpy.ok():
             self.cmd_pub.publish(Twist())
 
+
 def main(args=None):
     # Keep the context alive through SIGINT so the zero Twist in shutdown() is
     # actually delivered; rclpy's own handler would invalidate it first.
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
-    
+
     node = None
     try:
         node = WallFollowerController()
@@ -485,6 +492,7 @@ def main(args=None):
             node.shutdown()
             node.destroy_node()
         rclpy.try_shutdown()
+
 
 if __name__ == '__main__':
     main()

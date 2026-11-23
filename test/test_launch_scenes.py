@@ -78,7 +78,8 @@ class TestScenes(unittest.TestCase):
         self.probe.create_subscription(Twist, '/cmd_vel', self._on_cmd, 10)
 
     def _on_cmd(self, m):
-        self.trace.append((time.monotonic() - self.t0, self.scene, self.states[-1] if self.states else '',
+        self.trace.append((time.monotonic() - self.t0, self.scene,
+                           self.states[-1] if self.states else '',
                            m.linear.x, m.angular.z))
 
     def tearDown(self):

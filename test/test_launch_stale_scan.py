@@ -10,7 +10,6 @@ import unittest
 
 import launch
 import launch_ros.actions
-import launch_testing
 import launch_testing.actions
 import pytest
 import rclpy
@@ -54,7 +53,8 @@ class TestStaleScan(unittest.TestCase):
     def test_robot_stops_when_scans_stop(self):
         probe = rclpy.create_node('stale_probe')
         states, cmds = [], []
-        probe.create_subscription(String, '/wall_follower/state', lambda m: states.append(m.data), 10)
+        probe.create_subscription(
+            String, '/wall_follower/state', lambda m: states.append(m.data), 10)
         probe.create_subscription(Twist, '/cmd_vel', cmds.append, 10)
         pub = probe.create_publisher(LaserScan, '/scan', qos_profile_sensor_data)
         scan = wall_right_scan()
@@ -64,7 +64,8 @@ class TestStaleScan(unittest.TestCase):
                     states and states[-1] == 'FOLLOWING' and cmds and cmds[-1].linear.x > 0.05):
                 pub.publish(scan)
                 rclpy.spin_once(probe, timeout_sec=0.05)
-            self.assertTrue(cmds and cmds[-1].linear.x > 0.05, 'never drove forward while following')
+            self.assertTrue(cmds and cmds[-1].linear.x > 0.05,
+                            'never drove forward while following')
             cmds.clear()
             end = time.monotonic() + 2.0  # scans stop here
             while time.monotonic() < end:
@@ -73,5 +74,6 @@ class TestStaleScan(unittest.TestCase):
             probe.destroy_node()
         late = [c for c in cmds[len(cmds) // 2:]]  # the second second after the last scan
         self.assertTrue(late, 'no /cmd_vel after the scans stopped')
+        tail = [(round(c.linear.x, 2), round(c.angular.z, 2)) for c in late[-3:]]
         self.assertTrue(all(c.linear.x == 0.0 and c.angular.z == 0.0 for c in late),
-                        f'still moving 1-2 s after the last scan: {[(round(c.linear.x, 2), round(c.angular.z, 2)) for c in late[-3:]]}')
+                        f'still moving 1-2 s after the last scan: {tail}')

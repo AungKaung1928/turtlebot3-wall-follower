@@ -11,7 +11,6 @@ import unittest
 
 import launch
 import launch_ros.actions
-import launch_testing
 import launch_testing.actions
 import pytest
 import rclpy
@@ -32,7 +31,8 @@ def generate_test_description():
                                    output='screen', parameters=[PARAMS, {'use_sim_time': False}])
     # Keeps the launch (and the shared rclpy context) alive after the node exits on SIGINT.
     keepalive = launch.actions.ExecuteProcess(cmd=['sleep', '60'])
-    return launch.LaunchDescription([node, keepalive, launch_testing.actions.ReadyToTest()]), {'node': node}
+    return (launch.LaunchDescription([node, keepalive, launch_testing.actions.ReadyToTest()]),
+            {'node': node})
 
 
 def wall_right_scan():
@@ -57,7 +57,8 @@ class TestStaleScan(unittest.TestCase):
     def test_sigint_sends_a_final_stop(self, proc_info, node):
         probe = rclpy.create_node('sigint_probe')
         states, cmds = [], []
-        probe.create_subscription(String, '/wall_follower/state', lambda m: states.append(m.data), 10)
+        probe.create_subscription(
+            String, '/wall_follower/state', lambda m: states.append(m.data), 10)
         probe.create_subscription(Twist, '/cmd_vel', cmds.append, 10)
         pub = probe.create_publisher(LaserScan, '/scan', qos_profile_sensor_data)
         scan = wall_right_scan()
@@ -67,7 +68,8 @@ class TestStaleScan(unittest.TestCase):
                     states and states[-1] == 'FOLLOWING' and cmds and cmds[-1].linear.x > 0.05):
                 pub.publish(scan)
                 rclpy.spin_once(probe, timeout_sec=0.05)
-            self.assertTrue(cmds and cmds[-1].linear.x > 0.05, 'never drove forward while following')
+            self.assertTrue(cmds and cmds[-1].linear.x > 0.05,
+                            'never drove forward while following')
             os.kill(proc_info[node].pid, signal.SIGINT)
             end = time.monotonic() + 3.0  # scans keep coming, so only shutdown() can send the stop
             while time.monotonic() < end:
@@ -77,4 +79,5 @@ class TestStaleScan(unittest.TestCase):
             probe.destroy_node()
         last = cmds[-1]
         self.assertEqual((last.linear.x, last.angular.z), (0.0, 0.0),
-                         f'last command after SIGINT is not a stop: {(last.linear.x, last.angular.z)}')
+                         'last command after SIGINT is not a stop: '
+                         f'{(last.linear.x, last.angular.z)}')
