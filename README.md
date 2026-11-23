@@ -35,7 +35,7 @@ Requires Ubuntu 22.04, ROS 2 Humble and Gazebo Harmonic (`gz-harmonic`, `ros-hum
 ```bash
 sudo apt install ros-humble-turtlebot3-description ros-humble-xacro ros-humble-robot-state-publisher
 mkdir -p ~/wall_follower_ws/src && cd ~/wall_follower_ws/src
-git clone <this repo URL>
+git clone https://github.com/AungKaung1928/turtlebot3-wall-follower.git
 cd .. && colcon build --symlink-install && source install/setup.bash
 ros2 launch wall_following_project wall_follower_gazebo.launch.py   # Gazebo opens, the burger finds the nearest wall and laps the room
 ```
@@ -55,7 +55,7 @@ If `/scan` stops (no message for 0.5 s), the node publishes a zero `/cmd_vel` in
 Inside corners are handled by the AVOIDING state (front < 0.35 m, stop, turn
 away, resume), a hard stop-and-turn rather than a planned arc; it costs about
 2 s per corner. A front-arc steering term in `follow_wall()` is the planned
-improvement. The controller is a single 480-line Python node; the C++ port is
+improvement. The controller is a single Python node (about 490 lines); the C++ port is
 [turtlebot3-wall-follower-cpp](https://github.com/AungKaung1928/turtlebot3-wall-follower-cpp).
 
 More: algorithm and equations, all parameters, the bugs found by measurement, tuning and troubleshooting in [docs/DETAILS.md](docs/DETAILS.md).
