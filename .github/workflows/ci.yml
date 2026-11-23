@@ -48,3 +48,8 @@ jobs:
           path: |
             scenes.csv
             scenes.svg
+      - name: Lint (the ament tests shipped in test/)
+        run: |
+          source install/setup.bash
+          cd src/wall_following_project
+          python3 -m pytest test/test_flake8.py test/test_pep257.py test/test_copyright.py -v
