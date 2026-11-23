@@ -48,9 +48,9 @@ jobs:
           path: |
             scenes.csv
             scenes.svg
-      - name: Lint (ament flake8 + copyright tests shipped in test/)
+      - name: Lint (ament flake8 test shipped in test/)
         run: |
           source install/setup.bash
           cd src/wall_following_project
-          # test_pep257.py still finds docstring style errors (open); flake8 + copyright gate CI.
+          # flake8 gates CI; test_copyright skips itself (no headers); test_pep257 still fails (open).
           python3 -m pytest test/test_flake8.py test/test_copyright.py -v
