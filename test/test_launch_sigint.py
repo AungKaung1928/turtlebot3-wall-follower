@@ -30,7 +30,9 @@ PARAMS = os.path.join(get_package_share_directory(PKG), 'config', 'wall_followin
 def generate_test_description():
     node = launch_ros.actions.Node(package=PKG, executable=EXE, name='wall_follower_controller',
                                    output='screen', parameters=[PARAMS, {'use_sim_time': False}])
-    return launch.LaunchDescription([node, launch_testing.actions.ReadyToTest()]), {'node': node}
+    # Keeps the launch (and the shared rclpy context) alive after the node exits on SIGINT.
+    keepalive = launch.actions.ExecuteProcess(cmd=['sleep', '60'])
+    return launch.LaunchDescription([node, keepalive, launch_testing.actions.ReadyToTest()]), {'node': node}
 
 
 def wall_right_scan():
