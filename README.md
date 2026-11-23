@@ -48,7 +48,7 @@ Without Gazebo: `python3 -m pytest test/test_node_topics.py` (after `source inst
 
 What the node commands in each launch-test scene (CI run of a8b333f, CSV artifact plotted by `scripts/plot_scenes.py`): synthetic scans, no robot motion, so it shows the state machine and control outputs, not driving quality.
 
-If `/scan` stops (no message for 0.5 s), the node publishes a zero `/cmd_vel` instead of driving on the last scan; `test/test_launch_stale_scan.py` checks this in CI.
+If `/scan` stops (no message for 0.5 s), the node publishes a zero `/cmd_vel` instead of driving on the last scan; `test/test_launch_stale_scan.py` checks this in CI. Ctrl+C (SIGINT) also ends with a zero `/cmd_vel` (`test/test_launch_sigint.py`).
 
 ## Limits
 
